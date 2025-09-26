@@ -10,6 +10,8 @@ import { upsertUser } from '../db/user';
 import { and, eq, gte, lte, inArray } from 'drizzle-orm';
 import { logger } from '../utils/logger';
 
+const priorityIcons = { low: '🟢', normal: '🟡', high: '🔴' } as const;
+
 export function registerBotHandlers(bot: Bot<Context>) {
   bot.on('message:text', async (ctx) => {
     const user = await upsertUser(ctx);
@@ -126,9 +128,10 @@ const t = await db.query.tasks.findFirst({ where: and(eq(tasks.userId, user.id),
         } else {
           const lines = list.map((t) => {
             const status = t.done ? '✅' : '🕒';
-            const priority = t.priority ? t.priority.toUpperCase() : 'NORMAL';
+            const priorityKey = (t.priority ?? 'normal').toLowerCase();
+            const priority = priorityIcons[priorityKey as keyof typeof priorityIcons] ?? '🟡';
             const timeLabel = t.startTime ? dayjs(t.startTime).format('MM-DD HH:mm') : '未安排时间';
-            return `• ${status} [${priority}] ${t.title} (${timeLabel})`;
+            return `• ${status} ${priority} ${t.title} (${timeLabel})`;
           });
           await ctx.reply(`📋 任务列表：
 ${lines.join('\n')}`);

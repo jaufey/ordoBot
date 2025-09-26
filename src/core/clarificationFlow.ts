@@ -20,7 +20,7 @@ export async function saveClarifications(userId: number, taskId: number, qs: Arr
 }
 
 /** 取下一条未回答的追问并发送 */
-export async function askNextClarification(userId: number, taskId: number, chatId: bigint) {
+export async function askNextClarification(userId: number, taskId: number, chatId: bigint | number | string) {
   const next = await db.query.clarifications.findFirst({
     where: and(eq(clarifications.userId, userId), eq(clarifications.taskId, taskId), eq(clarifications.answered, false)),
     orderBy: (c, { asc }) => [asc(c.orderIndex)]
@@ -32,7 +32,8 @@ export async function askNextClarification(userId: number, taskId: number, chatI
     : { inline_keyboard: [[{ text: "跳过", callback_data: `clarify_${taskId}_${next.questionId}_${encodeURIComponent("跳过")}` }]] };
 
   const text = `❓ ${next.question}\n${next.explanation ? `💡 ${next.explanation}` : ""}`;
-  await bot.api.sendMessage(chatId, text, { reply_markup: keyboard });
+  const targetChatId = typeof chatId === 'bigint' ? chatId.toString() : chatId;
+  await bot.api.sendMessage(targetChatId, text, { reply_markup: keyboard });
   return true;
 }
 
