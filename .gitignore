@@ -1,0 +1,12 @@
+.env
+
+node_modules
+dist
+drizzle
+.DS_Store
+.vscode
+.idea
+npm-debug.log
+yarn-error.log
+
+# Local environment variables
