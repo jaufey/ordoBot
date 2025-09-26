@@ -1,3 +1,4 @@
+import 'dotenv/config';
 // src/bot/index.ts
 import { Bot } from 'grammy';
 import { logger } from '../utils/logger';

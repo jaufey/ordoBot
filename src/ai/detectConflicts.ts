@@ -1,42 +1,45 @@
 // src/ai/detectConflicts.ts
+import type { ChatCompletionNamedToolChoice, ChatCompletionTool } from 'openai/resources/chat/completions';
 import { createChatCompletion } from '../utils/openaiClient';
 
 export async function detectConflicts(taskPool: any[]) {
-  const tool = {
-    type: "function",
+  const tools: ChatCompletionTool[] = [{
+    type: 'function',
     function: {
-      name: "detect_conflicts",
-      description: "检测任务池的时间/地点/专注/在家等冲突，并给出建议与原因",
+      name: 'detect_conflicts',
+      description: '检测任务池的时间、地点、专注度与环境冲突，并提供建议',
       parameters: {
-        type: "object",
+        type: 'object',
         properties: {
           conflicts: {
-            type: "array",
+            type: 'array',
             items: {
-              type: "object",
+              type: 'object',
               properties: {
-                blockingTaskId: { type: "number" },
-                blockedTaskId: { type: "number" },
-                reason: { type: "string" },
-                suggestion: { type: "string" },
-                newStartTime: { type: "string", nullable: true }
+                blockingTaskId: { type: 'number' },
+                blockedTaskId: { type: 'number' },
+                reason: { type: 'string' },
+                suggestion: { type: 'string' },
+                newStartTime: { type: 'string', nullable: true }
               },
-              required: ["blockingTaskId","blockedTaskId","reason","suggestion"]
+              required: ['blockingTaskId', 'blockedTaskId', 'reason', 'suggestion']
             }
           },
-          overallRecommendation: { type: "string" }
+          overallRecommendation: { type: 'string' }
         },
-        required: ["conflicts"]
+        required: ['conflicts']
       }
     }
-  };
+  }];
+
+  const toolChoice: ChatCompletionNamedToolChoice = { type: 'function', function: { name: 'detect_conflicts' } };
 
   const res = await createChatCompletion('detectConflicts', {
-    tools: [tool],
-    tool_choice: { type: "function", function: "detect_conflicts" },
+    tools,
+    tool_choice: toolChoice,
     messages: [
-      { role: "system", content: "根据任务池返回冲突与建议；偏向安全与高优先级任务。" },
-      { role: "user", content: JSON.stringify(taskPool) }
+      { role: 'system', content: '根据任务池返回可能的冲突及建议，并优先保障安全与高优先级任务。' },
+      { role: 'user', content: JSON.stringify(taskPool) }
     ]
   });
 

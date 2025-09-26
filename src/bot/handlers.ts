@@ -8,12 +8,19 @@ import { applyCombo } from '../core/comboHandler';
 import { saveClarifications, askNextClarification, applyClarificationAnswer } from '../core/clarificationFlow';
 import { upsertUser } from '../db/user';
 import { and, eq, gte, lte } from 'drizzle-orm';
+import { logger } from '../utils/logger';
 
 export function registerBotHandlers(bot: Bot<Context>) {
   bot.on('message:text', async (ctx) => {
     const user = await upsertUser(ctx);
     const input = ctx.message.text.trim();
     const parsed = await parseTask(input);
+    logger.info('Parsed input', { userId: user.id, input, parsed });
+
+    if (parsed.intent === 'unknown') {
+      await ctx.reply('❓ 抱歉，我没太明白你的意思。可以试试更具体地描述你的任务哦！');
+      return;
+    }
 
     switch (parsed.intent) {
       case 'add_task': {

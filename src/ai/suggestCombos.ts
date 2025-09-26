@@ -1,38 +1,41 @@
 // src/ai/suggestCombos.ts
+import type { ChatCompletionNamedToolChoice, ChatCompletionTool } from 'openai/resources/chat/completions';
 import { createChatCompletion } from '../utils/openaiClient';
 
 export async function suggestCombos(taskPool: any[]) {
-  const tool = {
-    type: "function",
+  const tools: ChatCompletionTool[] = [{
+    type: 'function',
     function: {
-      name: "suggest_combos",
-      description: "基于相同/相近地点、相似目的或顺路，建议合并任务以节省时间",
+      name: 'suggest_combos',
+      description: '基于地点或目的相近的任务提供合并执行建议，避免过度合并',
       parameters: {
-        type: "object",
+        type: 'object',
         properties: {
           combos: {
-            type: "array",
+            type: 'array',
             items: {
-              type: "object",
+              type: 'object',
               properties: {
-                taskIds: { type: "array", items: { type: "number" } },
-                reason: { type: "string" }
+                taskIds: { type: 'array', items: { type: 'number' } },
+                reason: { type: 'string' }
               },
-              required: ["taskIds","reason"]
+              required: ['taskIds', 'reason']
             }
           }
         },
-        required: ["combos"]
+        required: ['combos']
       }
     }
-  };
+  }];
+
+  const toolChoice: ChatCompletionNamedToolChoice = { type: 'function', function: { name: 'suggest_combos' } };
 
   const res = await createChatCompletion('suggestCombos', {
-    tools: [tool],
-    tool_choice: { type: "function", function: "suggest_combos" },
+    tools,
+    tool_choice: toolChoice,
     messages: [
-      { role: "system", content: "建议将能一起办的任务合并（购物/顺路等），不要过度合并；给出原因。" },
-      { role: "user", content: JSON.stringify(taskPool) }
+      { role: 'system', content: '识别可以顺路或同地办理的任务，给出合并理由，避免过度合并。' },
+      { role: 'user', content: JSON.stringify(taskPool) }
     ]
   });
 
