@@ -7,7 +7,7 @@ import { tasks } from '../db/schema';
 import { applyCombo } from '../core/comboHandler';
 import { saveClarifications, askNextClarification, applyClarificationAnswer } from '../core/clarificationFlow';
 import { upsertUser } from '../db/user';
-import { and, eq, gte, lte } from 'drizzle-orm';
+import { and, eq, gte, lte, inArray } from 'drizzle-orm';
 import { logger } from '../utils/logger';
 
 export function registerBotHandlers(bot: Bot<Context>) {
@@ -47,15 +47,88 @@ const t = await db.query.tasks.findFirst({ where: and(eq(tasks.userId, user.id),
 
       }
       case 'query_tasks': {
-        const start = dayjs().startOf('day').toDate();
-        const end = dayjs().endOf('day').toDate();
-        const list = await db.select().from(tasks)
-          .where(and(eq(tasks.userId, user.id), gte(tasks.startTime, start), lte(tasks.startTime, end)));
-        if (!list.length) {
-          await ctx.reply('📋 今天还没有任务。');
+        const filters = parsed.queryFilters ?? {};
+        const whereClauses = [eq(tasks.userId, user.id)];
+        const now = dayjs();
+
+        if (typeof filters.done === 'boolean') {
+          whereClauses.push(eq(tasks.done, filters.done));
         } else {
-          const lines = list.map((t) => `• ${t.done ? '✅' : '🕒'} ${t.title}${t.startTime ? ' - ' + dayjs(t.startTime).format('HH:mm') : ''}`);
-          await ctx.reply(`📋 今日任务：    ${lines.join('\n')}`);
+          whereClauses.push(eq(tasks.done, false));
+        }
+
+        if (typeof filters.notified === 'boolean') {
+          whereClauses.push(eq(tasks.notified, filters.notified));
+        }
+
+        if (filters.priorities?.length) {
+          whereClauses.push(inArray(tasks.priority, filters.priorities));
+        }
+
+        const dateFilter = filters.date;
+        let startBound: Date | undefined;
+        let endBound: Date | undefined;
+
+        if (dateFilter) {
+          switch (dateFilter.preset) {
+            case 'today': {
+              startBound = now.startOf('day').toDate();
+              endBound = now.endOf('day').toDate();
+              break;
+            }
+            case 'tomorrow': {
+              const d = now.add(1, 'day');
+              startBound = d.startOf('day').toDate();
+              endBound = d.endOf('day').toDate();
+              break;
+            }
+            case 'day_after_tomorrow': {
+              const d = now.add(2, 'day');
+              startBound = d.startOf('day').toDate();
+              endBound = d.endOf('day').toDate();
+              break;
+            }
+            case 'now': {
+              startBound = now.toDate();
+              break;
+            }
+          }
+
+          if (dateFilter.start) {
+            const parsedStart = dayjs(dateFilter.start);
+            if (parsedStart.isValid()) {
+              startBound = parsedStart.toDate();
+            }
+          }
+          if (dateFilter.end) {
+            const parsedEnd = dayjs(dateFilter.end);
+            if (parsedEnd.isValid()) {
+              endBound = parsedEnd.toDate();
+            }
+          }
+        }
+
+        if (startBound) {
+          whereClauses.push(gte(tasks.startTime, startBound));
+        }
+        if (endBound) {
+          whereClauses.push(lte(tasks.startTime, endBound));
+        }
+
+        const where = whereClauses.length === 1 ? whereClauses[0] : and(...whereClauses);
+        const list = await db.select().from(tasks).where(where).orderBy(tasks.startTime);
+
+        if (!list.length) {
+          await ctx.reply('📋 未找到符合条件的任务。');
+        } else {
+          const lines = list.map((t) => {
+            const status = t.done ? '✅' : '🕒';
+            const priority = t.priority ? t.priority.toUpperCase() : 'NORMAL';
+            const timeLabel = t.startTime ? dayjs(t.startTime).format('MM-DD HH:mm') : '未安排时间';
+            return `• ${status} [${priority}] ${t.title} (${timeLabel})`;
+          });
+          await ctx.reply(`📋 任务列表：
+${lines.join('\n')}`);
         }
         return;
       }

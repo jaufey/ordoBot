@@ -54,6 +54,7 @@ export const tasks = pgTable("tasks", {
   title: text("title").notNull(),
   category: text("category"),
   tags: jsonb("tags").$type<string[]>().default([]),
+  priority: text("priority").default('normal'),
 
   startTime: timestamp("start_time", { withTimezone: true }),
   endTime: timestamp("end_time", { withTimezone: true }),
