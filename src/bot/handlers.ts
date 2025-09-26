@@ -92,7 +92,7 @@ export function registerBotHandlers(bot: Bot<Context>) {
       await ctx.answerCallbackQuery({ text: '已采纳建议' });
     } else if (data.startsWith('applyCombo_')) {
       const ids = data.replace('applyCombo_', '').split(',').map(Number);
-      await applyCombo(ids, 'AI建议合并');
+      await applyCombo(ids, 'AI建议合并', user.id);
       await ctx.answerCallbackQuery({ text: '已合并' });
     } else if (data === 'applyReplan') {
       await ctx.answerCallbackQuery({ text: '已应用重排' });
