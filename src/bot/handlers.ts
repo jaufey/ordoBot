@@ -14,10 +14,13 @@ export function registerBotHandlers(bot: Bot<Context>) {
   bot.on('message:text', async (ctx) => {
     const user = await upsertUser(ctx);
     const input = ctx.message.text.trim();
+    await ctx.reply('🤖 明白了，正在处理...');
     const parsed = await parseTask(input);
     logger.info('Parsed input', { userId: user.id, input, parsed });
-    // await ctx.reply('🤖 明白了，正在处理...');
-    await ctx.reply('解析结果：' + JSON.stringify(parsed, null, 2));
+    
+    // 输出解析结果，避免 BigInt 序列化报错
+    await ctx.reply(`解析结果：
+${JSON.stringify(parsed, (key, value) => typeof value === 'bigint' ? value.toString() : value, 2)}`);
 
     switch (parsed.intent) {
       case 'add_task': {
@@ -172,6 +175,8 @@ ${lines.join('\n')}`);
         await db.update(tasks).set({ startTime: new Date(newTime), notified: false }).where(eq(tasks.id, Number(blockedId)));
       }
       await ctx.answerCallbackQuery({ text: '已采纳建议' });
+    } else if (data.startsWith('ignoreSuggestion_')) {
+      await ctx.answerCallbackQuery({ text: '已保持原计划' });
     } else if (data.startsWith('applyCombo_')) {
       const ids = data.replace('applyCombo_', '').split(',').map(Number);
       await applyCombo(ids, 'AI建议合并', user.id);
