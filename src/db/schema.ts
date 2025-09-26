@@ -24,8 +24,17 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow()
 });
 
-export type ContextConstraints = { requiresHome?: boolean; requiresFocus?: boolean; parallelizable?: boolean; };
-export type ConditionConstraints = { weather?: { type: "not_rainy" | "clear" }; timeOfDay?: "morning" | "afternoon" | "evening"; };
+export type ContextConstraints = {
+  requiresHome?: boolean;
+  requiresFocus?: boolean;
+  parallelizable?: boolean;
+  [key: string]: unknown;
+};
+export type ConditionConstraints = {
+  weather?: { type: 'not_rainy' | 'clear' } | Record<string, unknown>;
+  timeOfDay?: 'morning' | 'afternoon' | 'evening';
+  [key: string]: unknown;
+};
 
 export const tasks = pgTable("tasks", {
   id: serial("id").primaryKey(),
@@ -44,7 +53,6 @@ export const tasks = pgTable("tasks", {
   // 任务核心
   title: text("title").notNull(),
   category: text("category"),
-  location: text("location"),
   tags: jsonb("tags").$type<string[]>().default([]),
 
   startTime: timestamp("start_time", { withTimezone: true }),
