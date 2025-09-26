@@ -1,5 +1,5 @@
 // src/ai/parseTask.ts
-import { openai } from "../utils/openaiClient";
+import { createChatCompletion } from '../utils/openaiClient';
 import { parseRelative, applyRelativeOffset } from "../utils/time";
 
 export type ParseResult = {
@@ -69,8 +69,7 @@ export async function parseTask(rawInput: string): Promise<ParseResult> {
     }
   }];
 
-  const res = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+  const res = await createChatCompletion('parseTask', {
     tools,
     tool_choice: { type: "function", function: "parse_task" },
     messages: [

@@ -1,5 +1,5 @@
 // src/ai/suggestCombos.ts
-import { openai } from "../utils/openaiClient";
+import { createChatCompletion } from '../utils/openaiClient';
 
 export async function suggestCombos(taskPool: any[]) {
   const tool = {
@@ -27,8 +27,7 @@ export async function suggestCombos(taskPool: any[]) {
     }
   };
 
-  const res = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+  const res = await createChatCompletion('suggestCombos', {
     tools: [tool],
     tool_choice: { type: "function", function: "suggest_combos" },
     messages: [

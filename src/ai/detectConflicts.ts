@@ -1,5 +1,5 @@
 // src/ai/detectConflicts.ts
-import { openai } from "../utils/openaiClient";
+import { createChatCompletion } from '../utils/openaiClient';
 
 export async function detectConflicts(taskPool: any[]) {
   const tool = {
@@ -31,8 +31,7 @@ export async function detectConflicts(taskPool: any[]) {
     }
   };
 
-  const res = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+  const res = await createChatCompletion('detectConflicts', {
     tools: [tool],
     tool_choice: { type: "function", function: "detect_conflicts" },
     messages: [
