@@ -79,6 +79,7 @@
 | `combos` & `comboItems` | 任务合并建议和落地结果 |
 
 ### 📦 模块结构
+```
 src/
 ├─ ai/          # AI Function Calls (parseTask, detectConflicts, suggestCombos, replanTasks)
 ├─ core/        # 核心逻辑 (scheduler, notifier, conflictHandler, comboHandler, clarificationFlow)
@@ -86,7 +87,7 @@ src/
 ├─ bot/         # grammY (Telegram) 入口 & 交互
 ├─ cron/        # 定时扫描入口 (定时调度逻辑)
 └─ utils/       # 工具函数 (OpenAI client, 时间解析)
-
+```
 
 ### 🔧 开发 & 运行
 
