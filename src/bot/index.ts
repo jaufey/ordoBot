@@ -1,12 +1,16 @@
 // src/bot/index.ts
-import { Bot } from "grammy";
-import { parseTask } from "../ai/parseTask";
-import { insertTask } from "../core/scheduler";
+import { Bot } from 'grammy';
+import { logger } from '../utils/logger';
+import { registerBotHandlers } from './handlers';
 
-export const bot = new Bot(process.env.BOT_TOKEN!);
+const token = process.env.BOT_TOKEN;
+if (!token) {
+  throw new Error('BOT_TOKEN is not set');
+}
 
-bot.on("message:text", async (ctx) => {
-  const parsed = await parseTask(ctx.message.text);
-  await insertTask(parsed);
-  await ctx.reply(`任务已添加: ${parsed.title} ${parsed.startTime ?? ""}`);
-});
+export const bot = new Bot(token);
+
+registerBotHandlers(bot);
+
+void bot.start();
+logger.info('Bot started');
