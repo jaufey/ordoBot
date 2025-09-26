@@ -16,11 +16,8 @@ export function registerBotHandlers(bot: Bot<Context>) {
     const input = ctx.message.text.trim();
     const parsed = await parseTask(input);
     logger.info('Parsed input', { userId: user.id, input, parsed });
-
-    if (parsed.intent === 'unknown') {
-      await ctx.reply('❓ 抱歉，我没太明白你的意思。可以试试更具体地描述你的任务哦！');
-      return;
-    }
+    // await ctx.reply('🤖 明白了，正在处理...');
+    await ctx.reply('解析结果：' + JSON.stringify(parsed, null, 2));
 
     switch (parsed.intent) {
       case 'add_task': {
@@ -37,12 +34,17 @@ export function registerBotHandlers(bot: Bot<Context>) {
         return;
       }
       case 'mark_done': {
-        const t = await db.query.tasks.findFirst({ where: and(eq(tasks.userId, user.id), eq(tasks.done, false)) });
-        if (t) {
-          await db.update(tasks).set({ done: true }).where(eq(tasks.id, t.id));
-        }
-        await ctx.reply('✅ 已标记完成');
-        return;
+  
+const t = await db.query.tasks.findFirst({ where: and(eq(tasks.userId, user.id), eq(tasks.done, false)) });
+  if (t) {
+    await db.update(tasks).set({ done: true }).where(eq(tasks.id, t.id));
+    const timeLabel = t.startTime ? ` ${dayjs(t.startTime).format('HH:mm')}` : '';
+    await ctx.reply(`✅ 已标记完成：${t.title}${timeLabel}`);
+  } else {
+    await ctx.reply('📋 目前没有未完成的任务');
+  }
+  return;
+
       }
       case 'query_tasks': {
         const start = dayjs().startOf('day').toDate();
