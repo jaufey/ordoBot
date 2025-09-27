@@ -1,18 +1,46 @@
 // src/cron/index.ts
-import cron from "node-cron";
-import { notifyDueTasks } from "../core/notifier";
-import { runConflictDetection } from "../core/conflictHandler";
-import { runComboSuggest } from "../core/comboHandler";
-import { runReplan } from "../core/replanHandler";
+import cron from 'node-cron';
+import type { ScheduledTask } from 'node-cron';
+import { notifyDueTasks } from '../core/notifier';
+import { runConflictDetection } from '../core/conflictHandler';
+import { runComboSuggest } from '../core/comboHandler';
+import { runReplan } from '../core/replanHandler';
 
-// 每分钟：到点提醒
-cron.schedule("*/1 * * * *", async () => { await notifyDueTasks(); });
+let started = false;
+const scheduled: ScheduledTask[] = [];
 
-// 每5分钟：冲突检测
-cron.schedule("*/5 * * * *", async () => { await runConflictDetection(); });
+export function startCronJobs() {
+  if (started) return scheduled;
+  started = true;
 
-// 每15分钟：合并建议
-cron.schedule("*/15 * * * *", async () => { await runComboSuggest(); });
+  scheduled.push(
+    cron.schedule('*/1 * * * *', async () => {
+      await notifyDueTasks().catch((err) => console.error('[cron] notifyDueTasks failed', err));
+    })
+  );
 
-// 每10分钟：过期重排
-cron.schedule("*/10 * * * *", async () => { await runReplan(); });
+  scheduled.push(
+    cron.schedule('*/5 * * * *', async () => {
+      await runConflictDetection().catch((err) => console.error('[cron] runConflictDetection failed', err));
+    })
+  );
+
+  scheduled.push(
+    cron.schedule('*/15 * * * *', async () => {
+      await runComboSuggest().catch((err) => console.error('[cron] runComboSuggest failed', err));
+    })
+  );
+
+  scheduled.push(
+    cron.schedule('*/10 * * * *', async () => {
+      await runReplan().catch((err) => console.error('[cron] runReplan failed', err));
+    })
+  );
+
+  console.log('Cron jobs started');
+  return scheduled;
+}
+
+if (import.meta.main) {
+  startCronJobs();
+}

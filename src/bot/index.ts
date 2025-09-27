@@ -13,5 +13,7 @@ export const bot = new Bot(token);
 
 registerBotHandlers(bot);
 
-void bot.start();
-logger.info('Bot started');
+export async function startBot() {
+  await bot.start();
+  logger.info('Bot started');
+}
