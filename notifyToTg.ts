@@ -1,9 +1,7 @@
-import { Bot } from "grammy";
 import * as dotenv from "dotenv";
-
+import {bot } from './src/bot';
 dotenv.config();
 
-const bot = new Bot(process.env.BOT_TOKEN!);
 
 async function sendNotification(message: string) {
   try {

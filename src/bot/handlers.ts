@@ -11,6 +11,26 @@ import { upsertUser } from '../db/user';
 import { and, eq, gte, lte, inArray } from 'drizzle-orm';
 import { logger } from '../utils/logger';
 const priorityIcons = { low: '🟢', normal: '🟡', high: '🔴' } as const;
+
+async function finalizeCallbackMessage(ctx: Context, status: string) {
+  const original = ctx.callbackQuery?.message;
+  if (!original) return;
+  try {
+    if ('text' in original && original.text) {
+      await ctx.editMessageText(`${original.text}
+
+${status}`, { reply_markup: { inline_keyboard: [] } });
+    } else if ('caption' in original && original.caption) {
+      await ctx.editMessageCaption(`${original.caption}
+
+${status}`, { reply_markup: { inline_keyboard: [] } });
+    } else {
+      await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
+    }
+  } catch (err) {
+    logger.warn('Failed to finalize callback message', err);
+  }
+}
 export function registerBotHandlers(bot: Bot<Context>) {
   bot.on('message:text', async (ctx) => {
     const user = await upsertUser(ctx);
@@ -191,26 +211,33 @@ ${followUps.join('\n')}`);
       const until = dayjs().add(mins, 'minute').toDate();
       await db.update(tasks).set({ snoozedUntil: until, notified: false }).where(eq(tasks.id, id));
       await ctx.answerCallbackQuery({ text: `已推迟${mins}分钟` });
+      await finalizeCallbackMessage(ctx, `⏰ 已推迟${mins}分钟`);
     } else if (data.startsWith('cancel_')) {
       const id = Number(data.split('_')[1]);
       await db.delete(tasks).where(eq(tasks.id, id));
       await ctx.answerCallbackQuery({ text: '已取消' });
+      await finalizeCallbackMessage(ctx, '🗑 已取消');
     } else if (data.startsWith('applySuggestion_')) {
       const [, blockedId, newTime] = data.split('_');
       if (newTime) {
         await db.update(tasks).set({ startTime: new Date(newTime), notified: false }).where(eq(tasks.id, Number(blockedId)));
       }
       await ctx.answerCallbackQuery({ text: '已采纳建议' });
+      await finalizeCallbackMessage(ctx, '✅ 已采纳建议');
     } else if (data.startsWith('ignoreSuggestion_')) {
       await ctx.answerCallbackQuery({ text: '已保持原计划' });
+      await finalizeCallbackMessage(ctx, '⏳ 已保持原计划');
     } else if (data.startsWith('applyCombo_')) {
       const ids = data.replace('applyCombo_', '').split(',').map(Number);
       await applyCombo(ids, 'AI建议合并', user.id);
       await ctx.answerCallbackQuery({ text: '已合并' });
+      await finalizeCallbackMessage(ctx, '✅ 已合并');
     } else if (data === 'applyReplan') {
       await ctx.answerCallbackQuery({ text: '已应用重排' });
+      await finalizeCallbackMessage(ctx, '✅ 已应用重排');
     } else if (data === 'clearExpired') {
       await ctx.answerCallbackQuery({ text: '已清空过期任务' });
+      await finalizeCallbackMessage(ctx, '🧹 已清空过期任务');
     } else if (data.startsWith('clarify_')) {
       const [, taskIdStr, qid, encoded] = data.split('_');
       const taskId = Number(taskIdStr);
