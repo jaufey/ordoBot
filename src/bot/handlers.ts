@@ -12,6 +12,17 @@ import { and, eq, gte, lte, inArray } from 'drizzle-orm';
 import { logger } from '../utils/logger';
 const priorityIcons = { low: '🟢', normal: '🟡', high: '🔴' } as const;
 
+type TaskRow = typeof tasks.$inferSelect;
+
+async function loadTaskForCallback(ctx: Context, taskId: number, userId: number): Promise<TaskRow | null> {
+  const task = await db.query.tasks.findFirst({ where: and(eq(tasks.id, taskId), eq(tasks.userId, userId)) });
+  if (!task) {
+    await ctx.answerCallbackQuery({ text: '任务不存在或无权操作', show_alert: true });
+    return null;
+  }
+  return task;
+}
+
 async function finalizeCallbackMessage(ctx: Context, status: string) {
   const original = ctx.callbackQuery?.message;
   if (!original) return;
@@ -193,7 +204,28 @@ ${lines.join('\n')}`);
     const data = ctx.callbackQuery.data!;
     if (data.startsWith('done_')) {
       const id = Number(data.split('_')[1]);
-      await db.update(tasks).set({ done: true, doneAt: new Date() }).where(eq(tasks.id, id));
+      const task = await loadTaskForCallback(ctx, id, user.id);
+      if (!task) {
+        return;
+      }
+      if (task.done) {
+        await ctx.answerCallbackQuery({ text: '任务已完成，无需重复操作', show_alert: true });
+        await finalizeCallbackMessage(ctx, '✅ 已完成');
+        return;
+      }
+
+      const [updated] = await db
+        .update(tasks)
+        .set({ done: true, doneAt: new Date(), followupCount: 0, lastReminderAt: null })
+        .where(and(eq(tasks.id, id), eq(tasks.userId, user.id), eq(tasks.done, false)))
+        .returning({ id: tasks.id });
+
+      if (!updated) {
+        await ctx.answerCallbackQuery({ text: '任务状态已更新，请查看最新消息', show_alert: true });
+        await finalizeCallbackMessage(ctx, '⚠️ 操作已过期');
+        return;
+      }
+
       await ctx.answerCallbackQuery({ text: '完成啦！' });
       await finalizeCallbackMessage(ctx, '✅ 已完成');
       const activated = await activatePostTasks(id);
@@ -209,20 +241,83 @@ ${followUps.join('\n')}`);
       const [_, idStr, minStr] = data.split('_');
       const id = Number(idStr);
       const mins = Number(minStr);
+      const task = await loadTaskForCallback(ctx, id, user.id);
+      if (!task) {
+        return;
+      }
+      if (task.done) {
+        await ctx.answerCallbackQuery({ text: '任务已完成，不能再推迟', show_alert: true });
+        await finalizeCallbackMessage(ctx, '✅ 已完成');
+        return;
+      }
+
       const until = dayjs().add(mins, 'minute').toDate();
-      await db.update(tasks).set({ snoozedUntil: until, notified: false, followupCount: 0, lastReminderAt: null }).where(eq(tasks.id, id));
+      const [updated] = await db
+        .update(tasks)
+        .set({ snoozedUntil: until, notified: false, followupCount: 0, lastReminderAt: null })
+        .where(and(eq(tasks.id, id), eq(tasks.userId, user.id), eq(tasks.done, false)))
+        .returning({ id: tasks.id });
+
+      if (!updated) {
+        await ctx.answerCallbackQuery({ text: '任务状态已更新，请查看最新消息', show_alert: true });
+        await finalizeCallbackMessage(ctx, '⚠️ 操作已过期');
+        return;
+      }
+
       await ctx.answerCallbackQuery({ text: `已推迟${mins}分钟` });
       await finalizeCallbackMessage(ctx, `⏰ 已推迟${mins}分钟`);
     } else if (data.startsWith('cancel_')) {
       const id = Number(data.split('_')[1]);
-      await db.delete(tasks).where(eq(tasks.id, id));
+      const task = await loadTaskForCallback(ctx, id, user.id);
+      if (!task) {
+        return;
+      }
+      if (task.done) {
+        await ctx.answerCallbackQuery({ text: '任务已完成，不能取消', show_alert: true });
+        await finalizeCallbackMessage(ctx, '✅ 已完成');
+        return;
+      }
+
+      const [removed] = await db
+        .delete(tasks)
+        .where(and(eq(tasks.id, id), eq(tasks.userId, user.id), eq(tasks.done, false)))
+        .returning({ id: tasks.id });
+
+      if (!removed) {
+        await ctx.answerCallbackQuery({ text: '任务状态已更新，请查看最新消息', show_alert: true });
+        await finalizeCallbackMessage(ctx, '⚠️ 操作已过期');
+        return;
+      }
+
       await ctx.answerCallbackQuery({ text: '已取消' });
       await finalizeCallbackMessage(ctx, '🗑 已取消');
     } else if (data.startsWith('applySuggestion_')) {
       const [, blockedId, newTime] = data.split('_');
-      if (newTime) {
-        await db.update(tasks).set({ startTime: new Date(newTime), notified: false, followupCount: 0, lastReminderAt: null }).where(eq(tasks.id, Number(blockedId)));
+      const id = Number(blockedId);
+      const task = await loadTaskForCallback(ctx, id, user.id);
+      if (!task) {
+        return;
       }
+      if (task.done) {
+        await ctx.answerCallbackQuery({ text: '任务已完成，无法调整计划', show_alert: true });
+        await finalizeCallbackMessage(ctx, '✅ 已完成');
+        return;
+      }
+
+      if (newTime) {
+        const [updated] = await db
+          .update(tasks)
+          .set({ startTime: new Date(newTime), notified: false, followupCount: 0, lastReminderAt: null })
+          .where(and(eq(tasks.id, id), eq(tasks.userId, user.id), eq(tasks.done, false)))
+          .returning({ id: tasks.id });
+
+        if (!updated) {
+          await ctx.answerCallbackQuery({ text: '任务状态已更新，请查看最新消息', show_alert: true });
+          await finalizeCallbackMessage(ctx, '⚠️ 操作已过期');
+          return;
+        }
+      }
+
       await ctx.answerCallbackQuery({ text: '已采纳建议' });
       await finalizeCallbackMessage(ctx, '✅ 已采纳建议');
     } else if (data.startsWith('ignoreSuggestion_')) {
