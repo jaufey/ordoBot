@@ -47,7 +47,7 @@ export async function applyClarificationAnswer(userId: number, taskId: number, q
   // 2) 针对常见 questionId 做确定性处理（示例）
   if (questionId === "time_type") {
     // 例如：起飞时间 → 父任务表示航班；可在此倒推/调整
-    // （这里留空，通常配合 suggestedTasks 或再算倒推）
+    // （这里留空，通常配合 preTasks/postTasks 或重新计算倒推）
   }
   if (questionId === "preference_lactose") {
     // 设置用户画像：乳糖不耐

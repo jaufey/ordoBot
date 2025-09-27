@@ -12,12 +12,6 @@ type ClarificationQuestion = {
   explanation?: string | null;
 };
 
-type SuggestedTask = {
-  title: string;
-  estimatedDuration: number;
-  reason?: string | null;
-};
-
 type QueryDatePreset = 'today' | 'tomorrow' | 'day_after_tomorrow' | 'now';
 
 type QueryDateFilter = {
@@ -31,6 +25,15 @@ type QueryTaskFilters = {
   done?: boolean | null;
   notified?: boolean | null;
   priorities?: Array<'low' | 'normal' | 'high'> | null;
+};
+
+type DerivedTask = {
+  title: string;
+  estimatedDuration?: number | null;
+  relativeOffsetMinutes?: number | null;
+  startTime?: string | null;
+  priority?: 'low' | 'normal' | 'high' | null;
+  reason?: string | null;
 };
 
 export type ParseResult = {
@@ -48,7 +51,8 @@ export type ParseResult = {
   conditionConstraints?: ConditionConstraints | null;
   explanation?: string | null;
   clarificationQuestions?: ClarificationQuestion[];
-  suggestedTasks?: SuggestedTask[];
+  preTasks?: DerivedTask[] | null;
+  postTasks?: DerivedTask[] | null;
   isFollowUpAnswer?: boolean | null;
   queryFilters?: QueryTaskFilters | null;
 };
@@ -170,17 +174,38 @@ export const parseTaskTool: ChatCompletionTool = {
             required: ['id', 'question']
           }
         },
-        suggestedTasks: {
+        preTasks: {
           type: 'array',
-          description: '模型建议拆解出的子任务列表',
+          nullable: true,
+          description: '在主要任务之前需要完成的准备任务列表',
           items: {
             type: 'object',
             properties: {
-              title: { type: 'string', description: '子任务标题' },
-              estimatedDuration: { type: 'number', description: '子任务预计用时（分钟）' },
-              reason: { type: 'string', nullable: true, description: '产生该子任务的原因' }
+              title: { type: 'string', description: '任务标题' },
+              estimatedDuration: { type: 'number', nullable: true, description: '预计用时（分钟）' },
+              relativeOffsetMinutes: { type: 'number', nullable: true, description: '相对于主任务开始时间的分钟偏移（可为负）' },
+              startTime: { type: 'string', nullable: true, format: 'date-time', description: '绝对开始时间' },
+              priority: { type: 'string', nullable: true, enum: ['low', 'normal', 'high'], description: '任务优先级' },
+              reason: { type: 'string', nullable: true, description: '为何需要这项准备任务' }
             },
-            required: ['title', 'estimatedDuration']
+            required: ['title']
+          }
+        },
+        postTasks: {
+          type: 'array',
+          nullable: true,
+          description: '主任务完成后需要跟进的任务列表（如“拔掉电源”）',
+          items: {
+            type: 'object',
+            properties: {
+              title: { type: 'string', description: '任务标题' },
+              estimatedDuration: { type: 'number', nullable: true, description: '预计用时（分钟）' },
+              relativeOffsetMinutes: { type: 'number', nullable: true, description: '相对于主任务完成时间的分钟偏移' },
+              startTime: { type: 'string', nullable: true, format: 'date-time', description: '绝对开始时间' },
+              priority: { type: 'string', nullable: true, enum: ['low', 'normal', 'high'], description: '任务优先级' },
+              reason: { type: 'string', nullable: true, description: '安排该跟进任务的原因' }
+            },
+            required: ['title']
           }
         },
         isFollowUpAnswer: {
@@ -353,7 +378,7 @@ For Example:
       "explanation": "地点不同会影响交通时间、天气、预算建议。"
     }
   ],
-  "suggestedTasks": [
+  "preTasks": [
     {
       "title": "收拾行李",
       "estimatedDuration": 60,
@@ -369,6 +394,7 @@ For Example:
       "reason": "提前订票避免耽误行程"
     }
   ]
+  "postTasks": null
 }
 `;
 
