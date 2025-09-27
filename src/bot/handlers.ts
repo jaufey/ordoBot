@@ -10,9 +10,7 @@ import { createPreTasks, createPostTasks, activatePostTasks } from '../core/deri
 import { upsertUser } from '../db/user';
 import { and, eq, gte, lte, inArray } from 'drizzle-orm';
 import { logger } from '../utils/logger';
-
 const priorityIcons = { low: '🟢', normal: '🟡', high: '🔴' } as const;
-
 export function registerBotHandlers(bot: Bot<Context>) {
   bot.on('message:text', async (ctx) => {
     const user = await upsertUser(ctx);
@@ -24,15 +22,12 @@ export function registerBotHandlers(bot: Bot<Context>) {
     // 输出解析结果，避免 BigInt 序列化报错
     await ctx.reply(`解析结果：
 ${JSON.stringify(parsed, (key, value) => typeof value === 'bigint' ? value.toString() : value, 2)}`);
-
     switch (parsed.intent) {
       case 'add_task': {
         const row = toInsertable(input, parsed, user.id);
         const [task] = await db.insert(tasks).values(row).returning();
-
         const createdPre = await createPreTasks(task, parsed.preTasks);
         const createdPost = await createPostTasks(task, parsed.postTasks);
-
         if (parsed.clarificationQuestions?.length) {
           await saveClarifications(user.id, task.id, parsed.clarificationQuestions);
           await askNextClarification(user.id, task.id, BigInt(user.tgChatId));
@@ -40,7 +35,6 @@ ${JSON.stringify(parsed, (key, value) => typeof value === 'bigint' ? value.toStr
           await ctx.reply(`✅ 已添加：${task.title} ${task.startTime ? dayjs(task.startTime).format('HH:mm') : ''}${parsed.explanation ? `
 💡 ${parsed.explanation}` : ''}`);
         }
-
         if (createdPre.length) {
           const lines = createdPre.map((t) => {
             const timeLabel = t.startTime ? dayjs(t.startTime).format('MM-DD HH:mm') : '时间待定';
@@ -49,7 +43,6 @@ ${JSON.stringify(parsed, (key, value) => typeof value === 'bigint' ? value.toStr
           await ctx.reply(`🧾 已安排前置任务：
 ${lines.join('\n')}`);
         }
-
         if (createdPost.length) {
           const lines = createdPost.map((t) => {
             const info = t.relativeOffsetMinutes != null
@@ -62,6 +55,7 @@ ${lines.join('\n')}
 当主要任务完成时我会提醒你是否启动这些任务。`);
         }
         return;
+      }
       case 'mark_done': {
         const t = await db.query.tasks.findFirst({ where: and(eq(tasks.userId, user.id), eq(tasks.done, false)) });
         if (t) {
@@ -86,25 +80,20 @@ ${followUps.join('\n')}`);
         const filters = parsed.queryFilters ?? {};
         const whereClauses = [eq(tasks.userId, user.id)];
         const now = dayjs();
-
         if (typeof filters.done === 'boolean') {
           whereClauses.push(eq(tasks.done, filters.done));
         } else {
           whereClauses.push(eq(tasks.done, false));
         }
-
         if (typeof filters.notified === 'boolean') {
           whereClauses.push(eq(tasks.notified, filters.notified));
         }
-
         if (filters.priorities?.length) {
           whereClauses.push(inArray(tasks.priority, filters.priorities));
         }
-
         const dateFilter = filters.date;
         let startBound: Date | undefined;
         let endBound: Date | undefined;
-
         if (dateFilter) {
           switch (dateFilter.preset) {
             case 'today': {
@@ -129,7 +118,6 @@ ${followUps.join('\n')}`);
               break;
             }
           }
-
           if (dateFilter.start) {
             const parsedStart = dayjs(dateFilter.start);
             if (parsedStart.isValid()) {
@@ -143,17 +131,14 @@ ${followUps.join('\n')}`);
             }
           }
         }
-
         if (startBound) {
           whereClauses.push(gte(tasks.startTime, startBound));
         }
         if (endBound) {
           whereClauses.push(lte(tasks.startTime, endBound));
         }
-
         const where = whereClauses.length === 1 ? whereClauses[0] : and(...whereClauses);
         const list = await db.select().from(tasks).where(where).orderBy(tasks.startTime);
-
         if (!list.length) {
           await ctx.reply('📋 未找到符合条件的任务。');
         } else {
@@ -183,11 +168,9 @@ ${lines.join('\n')}`);
       }
     }
   });
-
   bot.on('callback_query:data', async (ctx) => {
     const user = await upsertUser(ctx);
     const data = ctx.callbackQuery.data!;
-
     if (data.startsWith('done_')) {
       const id = Number(data.split('_')[1]);
       await db.update(tasks).set({ done: true }).where(eq(tasks.id, id));
@@ -232,9 +215,7 @@ ${followUps.join('\n')}`);
       const [, taskIdStr, qid, encoded] = data.split('_');
       const taskId = Number(taskIdStr);
       const answer = decodeURIComponent(encoded);
-
       const finished = await applyClarificationAnswer(user.id, taskId, qid, answer);
-
       if (finished) {
         await ctx.editMessageText('✅ 已应用你的回答，计划已更新');
       } else {
