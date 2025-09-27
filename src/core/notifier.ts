@@ -45,10 +45,11 @@ export async function notifyDueTasks() {
 
     const chatId = t.chatId.toString();
     const snoozeMinutes = t.defaultSnoozeMinutes ?? 10;
+    const reminderAt = new Date();
 
     const [claimed] = await db
       .update(tasks)
-      .set({ notified: true })
+      .set({ notified: true, followupCount: 0, lastReminderAt: reminderAt })
       .where(and(eq(tasks.id, t.id), eq(tasks.notified, false)))
       .returning({ id: tasks.id });
 
@@ -72,7 +73,7 @@ ${t.explanation ? `💡 ${t.explanation}` : ''}`,
         }
       );
     } catch (err) {
-      await db.update(tasks).set({ notified: false }).where(eq(tasks.id, t.id));
+      await db.update(tasks).set({ notified: false, followupCount: 0, lastReminderAt: null }).where(eq(tasks.id, t.id));
       throw err;
     }
   }

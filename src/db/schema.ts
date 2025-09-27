@@ -68,8 +68,11 @@ export const tasks = pgTable("tasks", {
 
   // 状态
   done: boolean("done").default(false),
+  doneAt: timestamp("done_at", { withTimezone: true }),
   notified: boolean("notified").default(false),
   snoozedUntil: timestamp("snoozed_until", { withTimezone: true }),
+  followupCount: integer("followup_count").default(0),
+  lastReminderAt: timestamp("last_reminder_at", { withTimezone: true }),
 
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow()
 });

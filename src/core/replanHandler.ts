@@ -1,6 +1,8 @@
 // src/core/replanHandler.ts
 import { and, eq, lt } from 'drizzle-orm';
+import dayjs from 'dayjs';
 import { getExpiredUnfinished } from './scheduler';
+import { getFollowupSchedule } from './followupNotifier';
 import { replanTasks } from '../ai/replanTasks';
 import { bot } from '../bot';
 import { db } from '../db';
@@ -31,7 +33,28 @@ export async function runReplan() {
       continue;
     }
 
-    const plan = await replanTasks(expired);
+    const nowMoment = dayjs();
+    const eligible = expired.filter((task) => {
+      const schedule = getFollowupSchedule(task.priority);
+      const followupsSent = task.followupCount ?? 0;
+      if (!schedule.length) {
+        return true;
+      }
+      if (followupsSent >= schedule.length) {
+        if (!task.lastReminderAt) {
+          return true;
+        }
+        return nowMoment.diff(dayjs(task.lastReminderAt), 'minute', true) >= 1;
+      }
+      const lastThreshold = schedule[schedule.length - 1];
+      return nowMoment.diff(dayjs(task.startTime), 'minute', true) >= lastThreshold + 15;
+    });
+
+    if (!eligible.length) {
+      continue;
+    }
+
+    const plan = await replanTasks(eligible);
     const chatId = user.tgChatId.toString();
 
     let text = `${plan.encouragement}

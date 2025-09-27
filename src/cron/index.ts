@@ -2,6 +2,7 @@
 import cron from 'node-cron';
 import type { ScheduledTask } from 'node-cron';
 import { notifyDueTasks } from '../core/notifier';
+import { notifyFollowups } from '../core/followupNotifier';
 import { runConflictDetection } from '../core/conflictHandler';
 import { runComboSuggest } from '../core/comboHandler';
 import { runReplan } from '../core/replanHandler';
@@ -16,6 +17,12 @@ export function startCronJobs() {
   scheduled.push(
     cron.schedule('*/15 * * * * *', async () => {
       await notifyDueTasks().catch((err) => console.error('[cron] notifyDueTasks failed', err));
+    })
+  );
+
+  scheduled.push(
+    cron.schedule('*/15 * * * * *', async () => {
+      await notifyFollowups().catch((err) => console.error('[cron] notifyFollowups failed', err));
     })
   );
 

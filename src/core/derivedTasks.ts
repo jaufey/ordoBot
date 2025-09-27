@@ -79,7 +79,7 @@ export async function activatePostTasks(parentTaskId: number): Promise<TaskRow[]
     const startTime = post.startTime ?? computeDerivedStartTime(null, post.relativeOffsetMinutes, null);
     if (shouldUpdate) {
       const [updated] = await db.update(tasks)
-        .set({ startTime, notified: false })
+        .set({ startTime, notified: false, followupCount: 0, lastReminderAt: null })
         .where(eq(tasks.id, post.id))
         .returning();
       results.push(updated);

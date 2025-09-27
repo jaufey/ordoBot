@@ -79,7 +79,7 @@ ${lines.join('\n')}
       case 'mark_done': {
         const t = await db.query.tasks.findFirst({ where: and(eq(tasks.userId, user.id), eq(tasks.done, false)) });
         if (t) {
-          await db.update(tasks).set({ done: true }).where(eq(tasks.id, t.id));
+          await db.update(tasks).set({ done: true, doneAt: new Date() }).where(eq(tasks.id, t.id));
           const timeLabel = t.startTime ? ` ${dayjs(t.startTime).format('HH:mm')}` : '';
           await ctx.reply(`✅ 已标记完成：${t.title}${timeLabel}`);
           const activated = await activatePostTasks(t.id);
@@ -193,8 +193,9 @@ ${lines.join('\n')}`);
     const data = ctx.callbackQuery.data!;
     if (data.startsWith('done_')) {
       const id = Number(data.split('_')[1]);
-      await db.update(tasks).set({ done: true }).where(eq(tasks.id, id));
+      await db.update(tasks).set({ done: true, doneAt: new Date() }).where(eq(tasks.id, id));
       await ctx.answerCallbackQuery({ text: '完成啦！' });
+      await finalizeCallbackMessage(ctx, '✅ 已完成');
       const activated = await activatePostTasks(id);
       if (activated.length) {
         const followUps = activated.map((ft) => {
@@ -209,7 +210,7 @@ ${followUps.join('\n')}`);
       const id = Number(idStr);
       const mins = Number(minStr);
       const until = dayjs().add(mins, 'minute').toDate();
-      await db.update(tasks).set({ snoozedUntil: until, notified: false }).where(eq(tasks.id, id));
+      await db.update(tasks).set({ snoozedUntil: until, notified: false, followupCount: 0, lastReminderAt: null }).where(eq(tasks.id, id));
       await ctx.answerCallbackQuery({ text: `已推迟${mins}分钟` });
       await finalizeCallbackMessage(ctx, `⏰ 已推迟${mins}分钟`);
     } else if (data.startsWith('cancel_')) {
@@ -220,7 +221,7 @@ ${followUps.join('\n')}`);
     } else if (data.startsWith('applySuggestion_')) {
       const [, blockedId, newTime] = data.split('_');
       if (newTime) {
-        await db.update(tasks).set({ startTime: new Date(newTime), notified: false }).where(eq(tasks.id, Number(blockedId)));
+        await db.update(tasks).set({ startTime: new Date(newTime), notified: false, followupCount: 0, lastReminderAt: null }).where(eq(tasks.id, Number(blockedId)));
       }
       await ctx.answerCallbackQuery({ text: '已采纳建议' });
       await finalizeCallbackMessage(ctx, '✅ 已采纳建议');
