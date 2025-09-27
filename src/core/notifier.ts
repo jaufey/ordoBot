@@ -46,21 +46,34 @@ export async function notifyDueTasks() {
     const chatId = t.chatId.toString();
     const snoozeMinutes = t.defaultSnoozeMinutes ?? 10;
 
-    await bot.api.sendMessage(
-      chatId,
-      `🔔 到点了：${t.title}
-${t.explanation ? `💡 ${t.explanation}` : ''}`,
-      {
-        reply_markup: {
-          inline_keyboard: [[
-            { text: '✅ 完成', callback_data: `done_${t.id}` },
-            { text: `⏰ 推迟${snoozeMinutes}分钟`, callback_data: `snooze_${t.id}_${snoozeMinutes}` },
-            { text: '🗑 取消', callback_data: `cancel_${t.id}` }
-          ]]
-        }
-      }
-    );
+    const [claimed] = await db
+      .update(tasks)
+      .set({ notified: true })
+      .where(and(eq(tasks.id, t.id), eq(tasks.notified, false)))
+      .returning({ id: tasks.id });
 
-    await db.update(tasks).set({ notified: true }).where(eq(tasks.id, t.id));
+    if (!claimed) {
+      continue;
+    }
+
+    try {
+      await bot.api.sendMessage(
+        chatId,
+        `🔔 到点了：${t.title}
+${t.explanation ? `💡 ${t.explanation}` : ''}`,
+        {
+          reply_markup: {
+            inline_keyboard: [[
+              { text: '✅ 完成', callback_data: `done_${t.id}` },
+              { text: `⏰ 推迟${snoozeMinutes}分钟`, callback_data: `snooze_${t.id}_${snoozeMinutes}` },
+              { text: '🗑 取消', callback_data: `cancel_${t.id}` }
+            ]]
+          }
+        }
+      );
+    } catch (err) {
+      await db.update(tasks).set({ notified: false }).where(eq(tasks.id, t.id));
+      throw err;
+    }
   }
 }

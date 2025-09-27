@@ -14,7 +14,7 @@ export function startCronJobs() {
   started = true;
 
   scheduled.push(
-    cron.schedule('*/1 * * * *', async () => {
+    cron.schedule('*/15 * * * * *', async () => {
       await notifyDueTasks().catch((err) => console.error('[cron] notifyDueTasks failed', err));
     })
   );
