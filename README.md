@@ -97,5 +97,5 @@ cp .env.example .env
 # 填写 OPENAI_API_KEY / BOT_TOKEN / DATABASE_URL
 
 npx drizzle-kit push      # 初始化数据库
-npx tsx src/bot/index.ts  # 启动 Telegram bot
-npx tsx src/cron/index.ts # 启动定时任务（核心调度逻辑）
+bun src/bot/index.ts  # 启动 Telegram bot
+bun src/cron/index.ts # 启动定时任务（核心调度逻辑）
