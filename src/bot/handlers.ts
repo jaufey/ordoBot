@@ -6,6 +6,7 @@ import { db } from '../db';
 import { tasks } from '../db/schema';
 import { applyCombo } from '../core/comboHandler';
 import { saveClarifications, askNextClarification, applyClarificationAnswer } from '../core/clarificationFlow';
+import { createPreTasks, createPostTasks, activatePostTasks } from '../core/derivedTasks';
 import { upsertUser } from '../db/user';
 import { and, eq, gte, lte, inArray } from 'drizzle-orm';
 import { logger } from '../utils/logger';
@@ -29,6 +30,9 @@ ${JSON.stringify(parsed, (key, value) => typeof value === 'bigint' ? value.toStr
         const row = toInsertable(input, parsed, user.id);
         const [task] = await db.insert(tasks).values(row).returning();
 
+        const createdPre = await createPreTasks(task, parsed.preTasks);
+        const createdPost = await createPostTasks(task, parsed.postTasks);
+
         if (parsed.clarificationQuestions?.length) {
           await saveClarifications(user.id, task.id, parsed.clarificationQuestions);
           await askNextClarification(user.id, task.id, BigInt(user.tgChatId));
@@ -36,20 +40,47 @@ ${JSON.stringify(parsed, (key, value) => typeof value === 'bigint' ? value.toStr
           await ctx.reply(`✅ 已添加：${task.title} ${task.startTime ? dayjs(task.startTime).format('HH:mm') : ''}${parsed.explanation ? `
 💡 ${parsed.explanation}` : ''}`);
         }
-        return;
-      }
-      case 'mark_done': {
-  
-const t = await db.query.tasks.findFirst({ where: and(eq(tasks.userId, user.id), eq(tasks.done, false)) });
-  if (t) {
-    await db.update(tasks).set({ done: true }).where(eq(tasks.id, t.id));
-    const timeLabel = t.startTime ? ` ${dayjs(t.startTime).format('HH:mm')}` : '';
-    await ctx.reply(`✅ 已标记完成：${t.title}${timeLabel}`);
-  } else {
-    await ctx.reply('📋 目前没有未完成的任务');
-  }
-  return;
 
+        if (createdPre.length) {
+          const lines = createdPre.map((t) => {
+            const timeLabel = t.startTime ? dayjs(t.startTime).format('MM-DD HH:mm') : '时间待定';
+            return `• 🛠 ${t.title} (${timeLabel})`;
+          });
+          await ctx.reply(`🧾 已安排前置任务：
+${lines.join('\n')}`);
+        }
+
+        if (createdPost.length) {
+          const lines = createdPost.map((t) => {
+            const info = t.relativeOffsetMinutes != null
+              ? `+${t.relativeOffsetMinutes} 分钟`
+              : (t.startTime ? dayjs(t.startTime).format('MM-DD HH:mm') : '触发后安排');
+            return `• 🔁 ${t.title} (${info})`;
+          });
+          await ctx.reply(`⏭ 已记录完成后的跟进任务：
+${lines.join('\n')}
+当主要任务完成时我会提醒你是否启动这些任务。`);
+        }
+        return;
+      case 'mark_done': {
+        const t = await db.query.tasks.findFirst({ where: and(eq(tasks.userId, user.id), eq(tasks.done, false)) });
+        if (t) {
+          await db.update(tasks).set({ done: true }).where(eq(tasks.id, t.id));
+          const timeLabel = t.startTime ? ` ${dayjs(t.startTime).format('HH:mm')}` : '';
+          await ctx.reply(`✅ 已标记完成：${t.title}${timeLabel}`);
+          const activated = await activatePostTasks(t.id);
+          if (activated.length) {
+            const followUps = activated.map((ft) => {
+              const timeLabel = ft.startTime ? dayjs(ft.startTime).format('MM-DD HH:mm') : '时间待定';
+              return `• 🔁 ${ft.title} (${timeLabel})`;
+            });
+            await ctx.reply(`⏭ 已安排后续任务：
+${followUps.join('\n')}`);
+          }
+        } else {
+          await ctx.reply('📋 目前没有未完成的任务');
+        }
+        return;
       }
       case 'query_tasks': {
         const filters = parsed.queryFilters ?? {};
@@ -161,6 +192,15 @@ ${lines.join('\n')}`);
       const id = Number(data.split('_')[1]);
       await db.update(tasks).set({ done: true }).where(eq(tasks.id, id));
       await ctx.answerCallbackQuery({ text: '完成啦！' });
+      const activated = await activatePostTasks(id);
+      if (activated.length) {
+        const followUps = activated.map((ft) => {
+          const timeLabel = ft.startTime ? dayjs(ft.startTime).format('MM-DD HH:mm') : '时间待定';
+          return `• 🔁 ${ft.title} (${timeLabel})`; 
+        });
+        await ctx.reply(`⏭ 已安排后续任务：
+${followUps.join('\n')}`);
+      }
     } else if (data.startsWith('snooze_')) {
       const [_, idStr, minStr] = data.split('_');
       const id = Number(idStr);

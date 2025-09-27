@@ -27,7 +27,7 @@ type QueryTaskFilters = {
   priorities?: Array<'low' | 'normal' | 'high'> | null;
 };
 
-type DerivedTask = {
+export type DerivedTask = {
   title: string;
   estimatedDuration?: number | null;
   relativeOffsetMinutes?: number | null;
