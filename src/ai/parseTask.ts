@@ -51,8 +51,6 @@ export type ParseResult = {
   conditionConstraints?: ConditionConstraints | null;
   explanation?: string | null;
   clarificationQuestions?: ClarificationQuestion[];
-  preTasks?: DerivedTask[] | null;
-  postTasks?: DerivedTask[] | null;
   isFollowUpAnswer?: boolean | null;
   queryFilters?: QueryTaskFilters | null;
 };
@@ -174,40 +172,6 @@ export const parseTaskTool: ChatCompletionTool = {
             required: ['id', 'question']
           }
         },
-        preTasks: {
-          type: 'array',
-          nullable: true,
-          description: '在主要任务之前需要完成的准备任务列表',
-          items: {
-            type: 'object',
-            properties: {
-              title: { type: 'string', description: '任务标题' },
-              estimatedDuration: { type: 'number', nullable: true, description: '预计用时（分钟）' },
-              relativeOffsetMinutes: { type: 'number', nullable: true, description: '相对于主任务开始时间的分钟偏移（可为负）' },
-              startTime: { type: 'string', nullable: true, format: 'date-time', description: '绝对开始时间' },
-              priority: { type: 'string', nullable: true, enum: ['low', 'normal', 'high'], description: '任务优先级' },
-              reason: { type: 'string', nullable: true, description: '为何需要这项准备任务' }
-            },
-            required: ['title']
-          }
-        },
-        postTasks: {
-          type: 'array',
-          nullable: true,
-          description: '主任务完成后需要跟进的任务列表（如“拔掉电源”）',
-          items: {
-            type: 'object',
-            properties: {
-              title: { type: 'string', description: '任务标题' },
-              estimatedDuration: { type: 'number', nullable: true, description: '预计用时（分钟）' },
-              relativeOffsetMinutes: { type: 'number', nullable: true, description: '相对于主任务完成时间的分钟偏移' },
-              startTime: { type: 'string', nullable: true, format: 'date-time', description: '绝对开始时间' },
-              priority: { type: 'string', nullable: true, enum: ['low', 'normal', 'high'], description: '任务优先级' },
-              reason: { type: 'string', nullable: true, description: '安排该跟进任务的原因' }
-            },
-            required: ['title']
-          }
-        },
         isFollowUpAnswer: {
           type: 'boolean',
           nullable: true,
@@ -306,7 +270,7 @@ You are an expert task scheduling and planning assistant. Your primary job is to
 
 12. **Identify missing critical information** (e.g., is '15:00' the start time or the departure time?). If critical information is missing, formulate 'clarificationQuestions'. Response for example: { "intent": "add_task", "raw_input": "明天中午坐飞机", "title": "飞机起飞", "startTime": "2025-09-26T15:00:00+08:00", "priority": "high", "priorityReason": "这是航班起飞时间，必须准时", "location": "airport", "contextConstraints": { "mustBeOutdoor": true }, "estimatedDuration": null, "clarificationQuestions": [ { "id": "time_type", "question": "你给的时间是出门时间还是飞机起飞时间？", "options": ["出门时间", "起飞时间", "家里开始收拾的时间"], "explanation": "确认基准点才能帮你倒推准备流程" }, { "id": "preparation_gap", "question": "要不要我帮你预留1小时收拾行李、15分钟洗澡？", "options": ["是的，自动安排", "不需要，我自己来安排"], "explanation": "这样能确保你提前完成准备，不会手忙脚乱" } ] }
 
-13. **Suggest relevant preparatory tasks** if applicable (e.g., travel/packing for a flight). 
+13. Keep explanations concise and focus on actionable details (1-2 sentences). 
 
 14. Provide a brief explanation for priorityReason and parallelReason, stating why the task was assigned its specific priority and why it can or cannot be run in parallel with other tasks.
 
@@ -378,23 +342,6 @@ For Example:
       "explanation": "地点不同会影响交通时间、天气、预算建议。"
     }
   ],
-  "preTasks": [
-    {
-      "title": "收拾行李",
-      "estimatedDuration": 60,
-      "location": "home",
-      "priority": "high",
-      "reason": "出门前必须完成，保证行李齐全"
-    },
-    {
-      "title": "购买车票或机票",
-      "estimatedDuration": 30,
-      "location": null,
-      "priority": "high",
-      "reason": "提前订票避免耽误行程"
-    }
-  ]
-  "postTasks": null
 }
 `;
 
@@ -431,9 +378,10 @@ function normalizeMinutes(value: number | null | undefined): number | null {
   return rounded;
 }
 export function toInsertable(rawInput: string, parsed: ParseResult, userId: number) {
-  const normalizedRelativeOffset = normalizeMinutes(parsed.relativeOffsetMinutes ?? null);
+  const originalRelativeOffset = parsed.relativeOffsetMinutes ?? null;
+  const normalizedRelativeOffset = normalizeMinutes(originalRelativeOffset);
   const normalizedDuration = normalizeMinutes(parsed.estimatedDuration ?? null);
-  const start = parsed.startTime ? new Date(parsed.startTime) : applyRelativeOffset(normalizedRelativeOffset ?? undefined);
+  const start = parsed.startTime ? new Date(parsed.startTime) : applyRelativeOffset(originalRelativeOffset ?? undefined);
 
   return {
     userId,

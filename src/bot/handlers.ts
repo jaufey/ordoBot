@@ -2,6 +2,8 @@
 import dayjs from 'dayjs';
 import type { Bot, Context } from 'grammy';
 import { parseTask, toInsertable } from '../ai/parseTask';
+import { generateDerivedTasks } from '../ai/generateDerivedTasks';
+import type { DerivedTask } from '../ai/parseTask';
 import { db } from '../db';
 import { tasks } from '../db/schema';
 import { applyCombo } from '../core/comboHandler';
@@ -56,9 +58,18 @@ ${JSON.stringify(parsed, (key, value) => typeof value === 'bigint' ? value.toStr
     switch (parsed.intent) {
       case 'add_task': {
         const row = toInsertable(input, parsed, user.id);
+        let preTasks: DerivedTask[] | null = null;
+        let postTasks: DerivedTask[] | null = null;
+        try {
+          const generated = await generateDerivedTasks(input, parsed);
+          preTasks = generated.preTasks;
+          postTasks = generated.postTasks;
+        } catch (err) {
+          logger.warn('Failed to generate derived tasks', err);
+        }
         const [task] = await db.insert(tasks).values(row).returning();
-        const createdPre = await createPreTasks(task, parsed.preTasks);
-        const createdPost = await createPostTasks(task, parsed.postTasks);
+        const createdPre = await createPreTasks(task, preTasks);
+        const createdPost = await createPostTasks(task, postTasks);
         if (parsed.clarificationQuestions?.length) {
           await saveClarifications(user.id, task.id, parsed.clarificationQuestions);
           await askNextClarification(user.id, task.id, BigInt(user.tgChatId));
