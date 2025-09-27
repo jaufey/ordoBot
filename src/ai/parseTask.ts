@@ -416,8 +416,24 @@ For Example:
   return parsed;
 }
 
+
+function normalizeMinutes(value: number | null | undefined): number | null {
+  if (value == null || Number.isNaN(value)) {
+    return null;
+  }
+  const rounded = Math.round(value);
+  if (value > 0 && rounded === 0) {
+    return 1;
+  }
+  if (value < 0 && rounded === 0) {
+    return -1;
+  }
+  return rounded;
+}
 export function toInsertable(rawInput: string, parsed: ParseResult, userId: number) {
-  const start = parsed.startTime ? new Date(parsed.startTime) : applyRelativeOffset(parsed.relativeOffsetMinutes ?? undefined);
+  const normalizedRelativeOffset = normalizeMinutes(parsed.relativeOffsetMinutes ?? null);
+  const normalizedDuration = normalizeMinutes(parsed.estimatedDuration ?? null);
+  const start = parsed.startTime ? new Date(parsed.startTime) : applyRelativeOffset(normalizedRelativeOffset ?? undefined);
 
   return {
     userId,
@@ -427,8 +443,8 @@ export function toInsertable(rawInput: string, parsed: ParseResult, userId: numb
     category: parsed.category ?? null,
     tags: parsed.tags ?? [],
     startTime: start ?? null,
-    estimatedDuration: parsed.estimatedDuration ?? null,
-    relativeOffsetMinutes: parsed.relativeOffsetMinutes ?? null,
+    estimatedDuration: normalizedDuration,
+    relativeOffsetMinutes: normalizedRelativeOffset,
     priority: parsed.priority ?? 'normal',
     priorityReason: parsed.priorityReason ?? null,
     parallelReason: parsed.parallelReason ?? null,
