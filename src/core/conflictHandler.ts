@@ -7,6 +7,67 @@ import { tasks, users } from '../db/schema';
 import { bot } from '../bot';
 import { getUpcomingTasks } from './scheduler';
 
+export async function checkConflictsForUser(userId: number, minutesAhead = 120) {
+  if (userId == null) {
+    return;
+  }
+
+  const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
+  if (!user?.tgChatId) {
+    return;
+  }
+
+  const pool = await getUpcomingTasks(userId, minutesAhead);
+  if (pool.length < 2) {
+    return;
+  }
+
+  const chatId = user.tgChatId.toString();
+  const debugPrefix = '🧪 [调试]';
+  const replacer = (key: string, value: unknown) => (typeof value === 'bigint' ? value.toString() : value);
+  await bot.api.sendMessage(chatId, `${debugPrefix} 开始检测冲突，任务数量：${pool.length}`);
+
+  let result: Awaited<ReturnType<typeof detectConflicts>>;
+  try {
+    result = await detectConflicts(pool);
+  } catch (err) {
+    await bot.api.sendMessage(chatId, `${debugPrefix} 检测失败：${err instanceof Error ? err.message : String(err)}`);
+    return;
+  }
+
+  const serialized = JSON.stringify(result ?? { conflicts: [] }, replacer, 2);
+  await bot.api.sendMessage(chatId, `${debugPrefix} 检测结果：
+${serialized}`);
+
+  if (!result?.conflicts?.length) {
+    return;
+  }
+
+  for (const c of result.conflicts) {
+    const messageBase = `⚠️ 检测到冲突
+原因：${c.reason}
+建议：${c.suggestion}`;
+    if (c.newStartTime) {
+      const when = dayjs(c.newStartTime).format('MM-DD HH:mm');
+      await bot.api.sendMessage(
+        chatId,
+        `${messageBase}
+⏰ 建议新的开始时间：${when}`,
+        {
+          reply_markup: {
+            inline_keyboard: [[
+              { text: '✅ 采纳建议', callback_data: `applySuggestion_${c.blockedTaskId}_${c.newStartTime}` },
+              { text: '⏳ 保持原计划', callback_data: `ignoreSuggestion_${c.blockedTaskId}` }
+            ]]
+          }
+        }
+      );
+    } else {
+      await bot.api.sendMessage(chatId, messageBase);
+    }
+  }
+}
+
 export async function runConflictDetection() {
   const now = dayjs();
   const end = now.add(120, 'minute').toDate();
@@ -28,41 +89,6 @@ export async function runConflictDetection() {
 
   // 针对每位用户分别检查冲突并通知到个人聊天
   for (const userId of userIds) {
-    if (userId == null) {
-      continue;
-    }
-
-    const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
-    if (!user?.tgChatId) {
-      continue;
-    }
-
-    const pool = await getUpcomingTasks(userId, 120);
-    if (pool.length < 2) {
-      continue;
-    }
-
-    const result = await detectConflicts(pool);
-    if (!result?.conflicts?.length) {
-      continue;
-    }
-
-    const chatId = user.tgChatId.toString();
-    for (const c of result.conflicts) {
-      await bot.api.sendMessage(
-        chatId,
-        `⚠️ 检测到冲突
-原因：${c.reason}
-建议：${c.suggestion}`,
-        {
-          reply_markup: {
-            inline_keyboard: [[
-              { text: '✅ 采纳建议', callback_data: `applySuggestion_${c.blockedTaskId}_${c.newStartTime ?? ''}` },
-              { text: '⏳ 保持原计划', callback_data: `ignoreSuggestion_${c.blockedTaskId}` }
-            ]]
-          }
-        }
-      );
-    }
+    await checkConflictsForUser(userId, 120);
   }
 }

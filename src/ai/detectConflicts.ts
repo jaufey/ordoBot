@@ -22,9 +22,9 @@ export async function detectConflicts(taskPool: any[]) {
                 blockedTaskId: { type: 'number' },
                 reason: { type: 'string' },
                 suggestion: { type: 'string' },
-                newStartTime: { type: 'string', nullable: true }
+                newStartTime: { type: 'string', format: 'date-time', description: '新的开始时间，必须是可执行的绝对时间' }
               },
-              required: ['blockingTaskId', 'blockedTaskId', 'reason', 'suggestion']
+              required: ['blockingTaskId', 'blockedTaskId', 'reason', 'suggestion', 'newStartTime']
             }
           },
           overallRecommendation: { type: 'string' }
@@ -44,6 +44,7 @@ Your job:
 2. Output a JSON object with:
     - conflicts: array of { blockingTaskId, blockedTaskId, reason, suggestion }
     - overallRecommendation: string explaining what the user might want to do (e.g. delay one task)
+3. Always combine startTime with estimatedDuration (minutes) to derive each task's execution window (endTime = startTime + estimatedDuration, default 0). Use these windows alongside contextConstraints, conditionConstraints, priority, and location requirements to detect conflicts and propose newStartTime values that keep the blocked task clear of all other tasks in the pool, including later ones.
 
 Output JSON with this structure:
 {
@@ -52,16 +53,19 @@ Output JSON with this structure:
       "blockingTaskId": number,
       "blockedTaskId": number,
       "reason": string,
-      "suggestion": string
+      "suggestion": string,
+      "newStartTime": string
     }
   ],
   "overallRecommendation": string
 }
 
 Rules:
+- For every conflict you must provide a concrete newStartTime in ISO8601 format for the blocked task; the rescheduled time must eliminate the conflict.
 - Treat tasks with priority=high as more important than normal/low.
 - If one task's duration overlaps another and they require different locations, consider it a conflict.
 - If one task requiresFocus=true, avoid scheduling other tasks during that time.
+- Note: The fields inside contextConstraints and conditionConstraints are not fixed. You can treat them as tags and use your common sense to infer whether they might cause conflicts.
 - Suggest safe adjustments, like delaying a lower-priority task by a few minutes.
 - Keep suggestions polite and concise.
 
@@ -95,7 +99,8 @@ Example output:
       "blockingTaskId": 1,
       "blockedTaskId": 2,
       "reason": "关煮蛋器是高优先级任务，且必须在家。散步会让你无法在20:05回家执行。",
-      "suggestion": "推迟散步10分钟，先关煮蛋器再出门"
+      "suggestion": "推迟散步10分钟，先关煮蛋器再出门",
+      "newStartTime": "2025-09-26T20:10:00+08:00"
     }
 ],
  "overallRecommendation": "建议先关掉煮蛋器，再开始散步，以免电器长时间无人看管"

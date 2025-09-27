@@ -9,6 +9,7 @@ import { tasks } from '../db/schema';
 import { applyCombo } from '../core/comboHandler';
 import { saveClarifications, askNextClarification, applyClarificationAnswer } from '../core/clarificationFlow';
 import { createPreTasks, createPostTasks, activatePostTasks } from '../core/derivedTasks';
+import { checkConflictsForUser } from '../core/conflictHandler';
 import { upsertUser } from '../db/user';
 import { and, eq, gte, lte, inArray } from 'drizzle-orm';
 import { logger } from '../utils/logger';
@@ -102,6 +103,11 @@ ${lines.join('\n')}`);
           await ctx.reply(`⏭ 已记录完成后的跟进任务：
 ${lines.join('\n')}
 当主要任务完成时我会提醒你是否启动这些任务。`);
+        }
+        try {
+          await checkConflictsForUser(user.id);
+        } catch (err) {
+          logger.warn('Failed to run conflict detection after add_task', err);
         }
         return;
       }
@@ -322,22 +328,32 @@ ${followUps.join('\n')}`);
         return;
       }
 
-      if (newTime) {
-        const [updated] = await db
-          .update(tasks)
-          .set({ startTime: new Date(newTime), notified: false, followupCount: 0, lastReminderAt: null })
-          .where(and(eq(tasks.id, id), eq(tasks.userId, user.id), eq(tasks.done, false)))
-          .returning({ id: tasks.id });
+      if (!newTime) {
+        await ctx.answerCallbackQuery({ text: '建议未包含新的时间，请稍后再试', show_alert: true });
+        await finalizeCallbackMessage(ctx, '⚠️ 暂无可应用的时间');
+        return;
+      }
 
-        if (!updated) {
-          await ctx.answerCallbackQuery({ text: '任务状态已更新，请查看最新消息', show_alert: true });
-          await finalizeCallbackMessage(ctx, '⚠️ 操作已过期');
-          return;
-        }
+      const [updated] = await db
+        .update(tasks)
+        .set({ startTime: new Date(newTime), notified: false, followupCount: 0, lastReminderAt: null })
+        .where(and(eq(tasks.id, id), eq(tasks.userId, user.id), eq(tasks.done, false)))
+        .returning({ id: tasks.id });
+
+      if (!updated) {
+        await ctx.answerCallbackQuery({ text: '任务状态已更新，请查看最新消息', show_alert: true });
+        await finalizeCallbackMessage(ctx, '⚠️ 操作已过期');
+        return;
       }
 
       await ctx.answerCallbackQuery({ text: '已采纳建议' });
       await finalizeCallbackMessage(ctx, '✅ 已采纳建议');
+
+      try {
+        await checkConflictsForUser(user.id);
+      } catch (err) {
+        logger.warn('Failed to re-check conflicts after applying suggestion', err);
+      }
     } else if (data.startsWith('ignoreSuggestion_')) {
       await ctx.answerCallbackQuery({ text: '已保持原计划' });
       await finalizeCallbackMessage(ctx, '⏳ 已保持原计划');
