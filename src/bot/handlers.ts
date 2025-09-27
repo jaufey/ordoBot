@@ -49,7 +49,14 @@ export function registerBotHandlers(bot: Bot<Context>) {
     const user = await upsertUser(ctx);
     const input = ctx.message.text.trim();
     await ctx.reply('🤖 明白了，正在处理...');
-    const parsed = await parseTask(input);
+    let parsed: Awaited<ReturnType<typeof parseTask>>;
+    try {
+      parsed = await parseTask(input);
+    } catch (err) {
+      logger.error('Failed to parse task', err);
+      await ctx.reply('😵 这次没能理解你的需求，请稍后再试。');
+      return;
+    }
     logger.info('Parsed input', { userId: user.id, input, parsed });
     
     // 输出解析结果，避免 BigInt 序列化报错

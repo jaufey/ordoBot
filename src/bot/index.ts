@@ -11,6 +11,10 @@ if (!token) {
 
 export const bot = new Bot(token);
 
+bot.catch((err) => {
+  logger.error('Bot error', { error: err.error, updateType: err.ctx?.updateType });
+});
+
 registerBotHandlers(bot);
 
 export async function startBot() {
