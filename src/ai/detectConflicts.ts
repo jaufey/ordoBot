@@ -37,7 +37,7 @@ export async function detectConflicts(taskPool: any[]) {
   const toolChoice: ChatCompletionNamedToolChoice = { type: 'function', function: { name: 'detect_conflicts' } };
 
   const systemPrompt = `You are a scheduling assistant. 
-You will receive a list of tasks with startTime, location, contextConstraints, ConditionConstraints, priority, and estimatedDuration.  
+You will receive a list of tasks with startTime, estimatedDuration, contextConstraints, ConditionConstraints, and priority.  
 
 Your job:
 1. Detect if there are conflicts that would prevent the user from completing tasks properly (e.g. being outside when a high-priority indoor task is due).
@@ -72,8 +72,7 @@ Example input:
       "id": 1,
       "title": "关煮蛋器",
       "startTime": "2025-09-26T20:05:00+08:00",
-      "location": "home",
-      "contextConstraints": { "requiresFocus": true, "mustBeIndoor": true },
+      "contextConstraints": { "requiresFocus": true, "mustBeIndoor": true, "location": "home" },
       "priority": "high",
       "estimatedDuration": 1
     },
@@ -81,8 +80,7 @@ Example input:
       "id": 2,
       "title": "散步",
       "startTime": "2025-09-26T20:00:00+08:00",
-      "location": "outdoor",
-      "contextConstraints": { "requiresFocus": false, "mustBeIndoor": false },
+      "contextConstraints": { "requiresFocus": false, "mustBeIndoor": false, "location": "outdoor" },
       "priority": "normal",
       "estimatedDuration": 30
     }
