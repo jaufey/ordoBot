@@ -68,9 +68,9 @@ ${JSON.stringify(parsed, (key, value) => typeof value === 'bigint' ? value.toStr
         let preTasks: DerivedTask[] | null = null;
         let postTasks: DerivedTask[] | null = null;
         try {
-          const generated = await generateDerivedTasks(input, parsed);
-          preTasks = generated.preTasks;
-          postTasks = generated.postTasks;
+          // const generated = await generateDerivedTasks(input, parsed);
+          // preTasks = generated.preTasks;
+          // postTasks = generated.postTasks;
         } catch (err) {
           logger.warn('Failed to generate derived tasks', err);
         }
