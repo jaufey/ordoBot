@@ -244,7 +244,7 @@ You are an expert task scheduling and planning assistant. Your primary job is to
 
 2. **Extract all possible information** including title, time, location, priority, and constraints.
 
-3. Start time: If you need to determine the start time based on a relative relationship, I can tell you that the current time is ${dayjs().format('YYYY-MM-DD[T]HH:mm:ssZ')}
+3. startTime: Current time is ${dayjs().format('YYYY-MM-DD[T]HH:mm:ssZ')}，If you need to determine the start time based on a relative relationship, use this timestamp as the reference and always return an explicit startTime when possible—even if you also provide relativeOffsetMinutes.
 
 4. **Automatically infer constraints** (mustBeIndoor/Outdoor, requiresFocus) based on the task title and context.
 
