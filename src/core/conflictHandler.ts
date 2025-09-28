@@ -44,15 +44,19 @@ ${serialized}`);
   }
 
   for (const c of result.conflicts) {
-    const messageBase = `⚠️ 检测到冲突
-原因：${c.reason}
-建议：${c.suggestion}`;
+    const sections = [
+      '⚠️ 检测到冲突',
+      `原因：${c.reason}`,
+      `建议：${c.suggestion}`
+    ];
     if (c.newStartTime) {
       const when = dayjs(c.newStartTime).format('MM-DD HH:mm');
+      sections.push(`⏰ 建议新的开始时间：${when}`);
       await bot.api.sendMessage(
         chatId,
-        `${messageBase}
-⏰ 建议新的开始时间：${when}`,
+        sections.join('
+
+'),
         {
           reply_markup: {
             inline_keyboard: [[
@@ -63,7 +67,9 @@ ${serialized}`);
         }
       );
     } else {
-      await bot.api.sendMessage(chatId, messageBase);
+      await bot.api.sendMessage(chatId, sections.join('
+
+'));
     }
   }
 }

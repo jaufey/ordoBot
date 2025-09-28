@@ -82,14 +82,23 @@ export async function notifyFollowups() {
 
     const snoozeMinutes = task.defaultSnoozeMinutes ?? 10;
     const priority = (task.priority ?? 'normal').toLowerCase();
-    const header = priority === 'high' ? '⚠️ 高优先级跟进提醒' : '⏰ 计划跟进提醒';
+    const sequence = followupsSent + 1;
+    const header = priority === 'high'
+      ? `⚠️ 高优先级跟进提醒 (${sequence} / ${schedule.length})`
+      : `⏰ 计划跟进提醒 (${sequence} / ${schedule.length})`;
     const overdueLabel = overdueMinutes >= 1 ? `（已超时约 ${Math.max(1, Math.round(overdueMinutes))} 分钟）` : '';
     const startLabel = dayjs(task.startTime).format('HH:mm');
-    const explanation = task.explanation ? `
-💡 ${task.explanation}` : '';
-    const message = `${header}
-任务「${task.title}」应在 ${startLabel} 完成${overdueLabel}。${explanation}
-请尽快确认进展，如已处理请点击“完成”，若需要更多时间可以选择推迟。`;
+    const parts = [
+      header,
+      `任务「${task.title}」应在 ${startLabel} 完成${overdueLabel}。`
+    ];
+    if (task.explanation) {
+      parts.push(`💡 ${task.explanation}`);
+    }
+    parts.push('请尽快确认进展，如已处理请点击“完成”，若需要更多时间可以选择推迟。');
+    const message = parts.join('
+
+');
 
     try {
       await bot.api.sendMessage(task.chatId.toString(), message, {

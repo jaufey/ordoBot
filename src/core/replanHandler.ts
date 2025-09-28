@@ -57,16 +57,42 @@ export async function runReplan() {
     const plan = await replanTasks(eligible);
     const chatId = user.tgChatId.toString();
 
-    let text = `${plan.encouragement}
-
-我建议如下重排：
-`;
-    for (const r of plan.replan) {
-      text += `- 任务#${r.taskId} → ${r.newStartTime}（${r.reason}）
-`;
+    const taskLookup = new Map(eligible.map((task) => [task.id, task]));
+    const sections: string[] = [];
+    if (plan.encouragement?.trim()) {
+      sections.push(plan.encouragement.trim());
+    }
+    if (plan.summary?.trim()) {
+      sections.push(plan.summary.trim());
     }
 
-    await bot.api.sendMessage(chatId, text, {
+    if (plan.replan?.length) {
+      const entries = plan.replan.map((r) => {
+        const source = taskLookup.get(r.taskId);
+        const title = source?.title ?? `任务#${r.taskId}`;
+        const original = source?.startTime ? dayjs(source.startTime).format('MM-DD HH:mm') : '未设置时间';
+        const suggested = dayjs(r.newStartTime).isValid() ? dayjs(r.newStartTime).format('MM-DD HH:mm') : r.newStartTime;
+        const lines = [
+          `• ${title}`,
+          `  原计划：${original}`,
+          `  建议时间：${suggested}`,
+          `  原因：${r.reason}`
+        ];
+        return lines.join('
+');
+      });
+      sections.push('我建议如下重排：', entries.join('
+
+'));
+    } else {
+      sections.push('当前没有需要调整的任务。');
+    }
+
+    const message = sections.join('
+
+');
+
+    await bot.api.sendMessage(chatId, message, {
       reply_markup: {
         inline_keyboard: [[
           { text: '✅ 采纳重排', callback_data: 'applyReplan' },

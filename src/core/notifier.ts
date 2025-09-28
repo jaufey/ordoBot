@@ -58,10 +58,15 @@ export async function notifyDueTasks() {
     }
 
     try {
+      const lines = [`🔔 到点了：${t.title}`];
+      if (t.explanation) {
+        lines.push('', `💡 ${t.explanation}`);
+      }
+      const message = lines.join('
+');
       await bot.api.sendMessage(
         chatId,
-        `🔔 到点了：${t.title}
-${t.explanation ? `💡 ${t.explanation}` : ''}`,
+        message,
         {
           reply_markup: {
             inline_keyboard: [[
