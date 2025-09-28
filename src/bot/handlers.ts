@@ -275,10 +275,10 @@ ${followUps.join('\n')}`);
         return;
       }
 
-      const until = dayjs().add(mins, 'minute').toDate();
+      const until = dayjs().add(mins, 'minute');
       const [updated] = await db
         .update(tasks)
-        .set({ snoozedUntil: until, notified: false, followupCount: 0, lastReminderAt: null })
+        .set({ snoozedUntil: until.toDate(), notified: false, followupCount: 0, lastReminderAt: null })
         .where(and(eq(tasks.id, id), eq(tasks.userId, user.id), eq(tasks.done, false)))
         .returning({ id: tasks.id });
 
@@ -288,8 +288,9 @@ ${followUps.join('\n')}`);
         return;
       }
 
-      await ctx.answerCallbackQuery({ text: `已推迟${mins}分钟` });
-      await finalizeCallbackMessage(ctx, `⏰ 已推迟${mins}分钟`);
+      const formatted = until.format('MM-DD HH:mm');
+      await ctx.answerCallbackQuery({ text: `已推迟${mins}分钟（${formatted}）` });
+      await finalizeCallbackMessage(ctx, `⏰ 已推迟${mins}分钟（${formatted}）`);
     } else if (data.startsWith('cancel_')) {
       const id = Number(data.split('_')[1]);
       const task = await loadTaskForCallback(ctx, id, user.id);

@@ -27,7 +27,7 @@ export function startCronJobs() {
   );
 
   scheduled.push(
-    cron.schedule('*/5 * * * *', async () => {
+    cron.schedule('*/10 * * * *', async () => {
       await runConflictDetection().catch((err) => console.error('[cron] runConflictDetection failed', err));
     })
   );
