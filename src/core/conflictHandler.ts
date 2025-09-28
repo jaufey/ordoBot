@@ -44,7 +44,7 @@ ${serialized}`);
   }
 
   for (const c of result.conflicts) {
-    const sections = [
+    const sections: string[] = [
       '⚠️ 检测到冲突',
       `原因：${c.reason}`,
       `建议：${c.suggestion}`
@@ -52,11 +52,10 @@ ${serialized}`);
     if (c.newStartTime) {
       const when = dayjs(c.newStartTime).format('MM-DD HH:mm');
       sections.push(`⏰ 建议新的开始时间：${when}`);
+      const message = sections.join('\n\n');
       await bot.api.sendMessage(
         chatId,
-        sections.join('
-
-'),
+        message,
         {
           reply_markup: {
             inline_keyboard: [[
@@ -67,11 +66,11 @@ ${serialized}`);
         }
       );
     } else {
-      await bot.api.sendMessage(chatId, sections.join('
-
-'));
+      const message = sections.join('\n\n');
+      await bot.api.sendMessage(chatId, message);
     }
   }
+
 }
 
 export async function runConflictDetection() {
